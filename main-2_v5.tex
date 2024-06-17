@@ -1,0 +1,258 @@
+\documentclass{article}
+\usepackage{hyperref}  % Enables clickable links and handles URLs
+\usepackage{url}       % Allows the use of the \url command
+\usepackage{graphicx}  % Required for inserting images
+\usepackage{amsmath, amssymb, amsthm}
+
+\title{Pairs Trading Mean Reversion Strategy}
+\author{Francesco Bondio, Luca Cereghetti, Matteo Rampazzo, Dario Vicedomini}
+\date{June 2024}
+
+\begin{document}  % Begin the document
+
+\maketitle  % Display the title, author, and date
+
+% Your document content goes here
+
+
+
+
+\section{INTRODUCTION}
+Pairs trading is a well-established speculative investment strategy in the financial markets, gaining prominence in the 1980s. Today, it is commonly utilized by hedge funds and institutional investors as a long/short equity strategy. Recent studies have expanded the original analysis of pairs trading to include more contemporary data, demonstrating both economically and statistically significant profits using a straightforward pairs trading approach. 
+
+Typically regarded as a form of technical analysis, pairs trading aims to identify the relative overvaluation and undervaluation between two closely related stocks that share a long-term relationship. Relative mispricing occurs when the spread between the two stocks deviates from its equilibrium, and excess returns can be generated if the pair is mean-reverting—meaning any deviations are temporary and will return to equilibrium after a period of adjustment. In such cases, the strategy involves simultaneously shorting the relatively overvalued stock and going long on the relatively undervalued stock.\footnote{Source: Rong Qi Liew, Yuan Wu, \textit{Pairs trading: A copula approach}, 2022.}. By working with intraday prices, we fit the most cointegrated pair to an Ornstein-Uhlenbeck (OU) process using maximum likelihood estimation (MLE). Subsequently, we employ an optimized exit rule to adjust positions, aiming to enhance mean reversion.
+
+\section*{Asset Pairs and data}
+We decided to analyze the asset data found in the paper "On the Efficacy of Optimized Exit Rules for Mean Reversion Trading." We were particularly curious to examine the types of correlations described in the study.
+\begin{itemize}
+    \item \textbf{USDJPY / NK}: This trading strategy relies on the positive correlation between the USD/JPY exchange rate and the Nikkei 225 index. Japan's economy is heavily reliant on exports, so when the Japanese yen strengthens against the US dollar (i.e., USDJPY falls), the Nikkei 225 index is likely to decline due to reduced export competitiveness. Conversely, a weakening Nikkei, often seen as a risk sentiment indicator, typically leads to a stronger yen, causing USDJPY to drop.
+    \item \textbf{USDCAD / CL}: Canada is one of the world's top oil producers. There is a positive correlation between the price of crude oil and the value of the Canadian dollar. When oil prices rise (or fall), the Canadian dollar tends to appreciate (or depreciate), leading to a decrease (or increase) in the USD/CAD exchange rate.
+    \item \textbf{CL / USO}: The United States Oil Fund (USO) is a major ETF that holds futures contracts on West Texas Intermediate (WTI) crude oil. As it tracks the price movements of these futures, USO and crude oil futures prices generally exhibit a strong positive correlation.
+    \item \textbf{GC / SI}: This pair involves trading between gold (GC) and silver (SI) spot prices. Both metals often move in tandem due to their common roles as safe-haven assets and inflation hedges, making this pair a classic case for analyzing relative metal pricing.
+    \item \textbf{AUDJPY / SPX}: This strategy involves trading between the AUD/JPY exchange rate, which is often considered a risk-on currency pair, and the S\&P 500 (SPX) futures, a benchmark for US equity markets. The S\&P 500 is widely used as an indicator of general investor sentiment towards risk.
+    \item \textbf{USDCHF / GC}: The Swiss National Bank holds a significant portion of its reserves in gold, implying a correlation between the Swiss franc and gold prices. When gold prices rise, the Swiss franc tends to strengthen (resulting in a decrease in USD/CHF), and vice versa.
+    \item \textbf{C / GS}: Citigroup (C) and Goldman Sachs (GS) are two major financial institutions in the banking sector. These large-cap stocks are often subject to similar market forces, which can create opportunities for pairs trading based on their relative performance.
+    \item \textbf{AAPL / FB}: Apple (AAPL) and Meta Platforms (FB, formerly known as Facebook) are two leading large-cap technology companies. Their stocks often exhibit related price movements due to their roles in the tech sector, providing a basis for analyzing their relative valuations.
+\end{itemize}
+Assets taken from\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.
+
+\subsection*{Data Connect to IBKR}
+Data were taken from Interactive Brokers Trader Workstation (IBKR TWS) using the \texttt{ib\_insync} library.
+The script fetches historical price data for the above mentioned specified assets over the past 5 months from 01.01.2024 to 31.05.2024, with minutes intervals. This data is used for parameter estimation and to check trading conditions.
+\clearpage
+
+
+
+
+
+
+
+
+
+
+\section{PRELIMINARY TEST}
+Before implementing the strategy, it is crucial to select assets that exhibit cointegration with one another. To achieve this, we utilize two models: the Augmented Dickey-Fuller (ADF) test and the Cointegrated Augmented Dickey-Fuller (CADF) test, as detailed below:
+
+\section*{Augmented Dickey-Fuller (ADF) test}
+The Augmented Dickey-Fuller (ADF) test is a widely utilized statistical method to assess whether a time series is stationary. A stationary time series maintains consistent properties over time, including mean, variance, and autocorrelation structure. Stationarity is critical in financial time series analysis for modeling and forecasting, especially for identifying mean-reverting behaviors.
+We are applying the ADF test to each asset to determine its stationarity, which is essential for subsequent analyses, such as cointegration testing and the formulation of robust trading strategies. This section focuses on verifying the stationarity of each asset individually, as the concept of cointegration is applicable only to non-stationary time series.
+
+\subsection*{Mathematical Foundation}
+The ADF test is based on the following regression model:
+\[
+\Delta y_t = \alpha + \beta t + \gamma y_{t-1} + \sum_{i=1}^p \delta_i \Delta y_{t-i} + \epsilon_t
+\]
+where:
+\begin{itemize}
+    \item \( y_t \) is the time series.
+    \item \( \Delta y_t \) is the first difference of \( y_t \), i.e., \( y_t - y_{t-1} \).
+    \item \( \alpha \) is a constant term.
+    \item \( \beta t \) represents a deterministic trend.
+    \item \( \gamma \) is the coefficient of the lagged level of the series.
+    \item \( p \) is the number of lagged difference terms.
+    \item \( \delta_i \) are coefficients of the lagged differences.
+    \item \( \epsilon_t \) is the white noise error term.
+\end{itemize}
+
+The null hypothesis (\(H_0\)) of the ADF test is that the time series has a unit root, implying it is non-stationary. The alternative hypothesis (\(H_1\)) is that the time series is stationary.
+
+\subsection*{Test Statistic and Interpretation}
+The key metric in the ADF test is the test statistic, which is compared against critical values at various significance levels (1\%, 5\%, and 10\%). The p-value is also computed to assess the significance of the test. If the p-value is below a certain threshold (commonly 0.05), the null hypothesis is rejected, indicating that the series is stationary.
+
+\subsection*{Source and Further Reading}
+For a more comprehensive understanding of the ADF test, refer to the seminal work by Dickey and Fuller:
+\begin{quote}
+Dickey, D. A., \& Fuller, W. A. (1979). \textit{Distribution of the Estimators for Autoregressive Time Series with a Unit Root}. Journal of the American Statistical Association, 74(366), 427-431.
+\end{quote}
+
+\subsection*{Results}
+Running the code these are the results:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{C:/Users/lucac/Documents/USI/Master/2nd semester/Programming/Project - Algotrading/Sources/image/ADF.jpg}
+    \caption{The Augmented Dickey-Fuller (ADF) test result.}
+    \label{fig:ADF}
+\end{figure}
+
+The majority of the financial time series tested are non-stationary, as indicated by high p-values (greater than 0.05) across most assets. 
+
+\section*{Cointegrated Augmented Dickey-Fuller (CADF) Test}
+In this section, we apply the Cointegrated Augmented Dickey-Fuller (CADF) test to each pair of assets to assess their cointegration. Cointegration analysis is critical for understanding long-term equilibrium relationships between non-stationary time series, which is essential for strategies such as pairs trading.
+
+\subsection{Mathematical Foundation}
+The CADF test extends the Augmented Dickey-Fuller (ADF) test by evaluating whether two or more non-stationary time series are cointegrated, implying they have a stable, long-term relationship despite individual stochastic trends. The mathematical foundation of the CADF test is built on the concept of cointegration.
+
+Given two time series \( X_t \) and \( Y_t \), they are considered cointegrated if there exists a linear combination \( Z_t = X_t - \beta Y_t \) that is stationary. The CADF test involves estimating the cointegration equation:
+\[
+Z_t = X_t - \beta Y_t + \epsilon_t
+\]
+where \( \epsilon_t \) is a stationary error term. We then test the null hypothesis that there is no cointegration (i.e., \( Z_t \) is non-stationary) against the alternative hypothesis of cointegration (i.e., \( Z_t \) is stationary).
+
+\subsection{Test Statistic Interpretation}
+The CADF test generates a test statistic \( \tau \) for the residuals \( \epsilon_t \) of the cointegration regression. The critical values for the test statistic depend on the sample size and the number of lags included in the model. If the test statistic \( \tau \) is less than the critical value at a chosen significance level (e.g., 5\%), the null hypothesis of no cointegration is rejected, indicating that the series are cointegrated.
+
+\[
+\tau = \frac{\hat{\beta}}{\text{SE}(\hat{\beta})}
+\]
+
+Here, \( \hat{\beta} \) is the estimated coefficient from the regression of \( X_t \) on \( Y_t \), and \( \text{SE}(\hat{\beta}) \) is its standard error.
+
+\subsection{Summary}
+The CADF test is a powerful tool for identifying long-term relationships between non-stationary time series. By analyzing the cointegration of pairs of assets, we can gain insights into their underlying economic relationships and develop trading strategies that exploit these connections.
+For further details on the CADF test, refer to \textcite{engle1987cointegration}, which provides a comprehensive introduction to cointegration and the methodology used in the CADF test.
+
+\begin{quote}
+\textbf{Source:} Engle, R. F., \& Granger, C. W. J. (1987). Cointegration and Error Correction: Representation, Estimation, and Testing. Econometrica, 55(2), 251-276. Retrieved from \url{https://www.jstor.org/stable/1913236}
+\end{quote}
+
+\subsection*{Results}
+Running the code these are the results:
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.7\textwidth]{C:/Users/lucac/Documents/USI/Master/2nd semester/Programming/Project - Algotrading/Sources/image/ADF.jpg}
+    
+    \caption{Cointegrated Augmented Dickey-Fuller (CADF) test result.}
+    \label{fig:ADF}
+\end{figure}
+
+Most of the pairs tested do not show significant evidence of cointegration, with the exception of the USD/CHF and Gold Futures pair, which demonstrates a strong long-term equilibrium relationship. This result is important for the development of trading strategies based on cointegration, as only cointegrated pairs offer opportunities to exploit such stable relationships. Therefore, for most of the pairs analyzed, other trading methodologies may be more appropriate.
+
+\clearpage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Entry - Exit Strategy Overview}
+The mean-reversion trading strategy implemented in the provided script leverages the Ornstein-Uhlenbeck (OU) process to model the statistical behavior of financial time series, such as stock prices. This approach captures the tendency of asset prices to revert to their long-term mean, allowing the strategy to exploit temporary deviations. By identifying and trading these deviations, the strategy aims to capitalize on the expected price corrections over time.
+We take the past data of the last ten days to estimate the parameters.
+
+\section*{Key Concepts of the Strategy}
+\subsection*{Mean-Reversion}
+Mean reversion is a financial theory suggesting that asset prices and historical returns eventually revert to their long-term average levels. This phenomenon is frequently observed in various financial markets where prices tend to fluctuate around a long-term mean or equilibrium level. The key assumption is that deviations from the mean are temporary and will eventually correct, allowing for potential trading opportunities. Mathematically, mean reversion can be represented as:
+\begin{equation}
+X_t = \mu + \phi (X_{t-1} - \mu) + \epsilon_t
+\end{equation}
+where \( X_t \) is the price at time \( t \), \( \mu \) is the long-term mean, \( \phi \) is the mean-reversion speed, and \( \epsilon_t \) is a white noise error term.
+SOURCE!!!
+
+\subsection*{Definition of portfolio}
+We start constructing a portfolio by holding a risky asset $S^1$ and shorting $B$ shares of another risky asset $S^2$. This resulting in
+\begin{equation}
+    X_t=S_t^1-BS_t^2
+\end{equation}
+In which $B$ is the pair ratio (which can be positive or negative), that determines how many units of the second asset $s^2$ are needed to offset or hedge one unit of the first asset $S^1$\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+For the USDCHF/GC pair, we define:
+\begin{itemize}
+    \item $S_t^1$: USDCHF (exchange rate)
+    \item $S_t^2$: GC (price of Gold)
+\end{itemize}
+
+\subsection*{Ornstein-Uhlenbeck Process}
+The Ornstein-Uhlenbeck (OU) process is a continuous-time stochastic process used to model mean-reverting behavior in financial markets. It is particularly suitable for describing the dynamics of asset prices that exhibit tendencies to revert to a mean level. The OU process is defined by the following stochastic differential equation (SDE):
+\begin{equation}
+dX_t = \theta (\mu - X_t) dt + \sigma dW_t
+\end{equation}
+Here, \( \theta \) represents the rate of mean reversion, \( \mu \) is the long-term mean, \( \sigma \) is the volatility (the degree of variation or dispersion of the price), and \( W_t \) is a standard Wiener process (Brownian motion). The term \( \theta (\mu - X_t) \) drives the process towards the mean \( \mu \), while \( \sigma dW_t \) adds randomness to the movement of \( X_t \).\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.
+
+\subsection*{Parameters Estimation}
+Estimating the parameters \( \theta \), \( \mu \), and \( \sigma \) is crucial for accurately modeling the OU process. We estimate the parameters through maximum likelihood estimation, tracking the time series data for each portfolio. By maximizing the average log-likelihood $\ell(\theta, \mu, \sigma \mid X_{B_0}, X_{B_1}, \ldots, X_{B_n})$, we determine the parameters $\theta^*$, $\mu^*$, and $\sigma^*$, which in turn help us identify optimal entry and exit points for trades.
+\begin{align}
+\ell(\theta, \mu, \sigma \mid X_0^B, X_1^B, \ldots, X_n^B) &= \frac{1}{n} \sum_{i=1}^n \ln f^{OU}(X_i^B \mid X_{i-1}^B; \theta, \mu, \sigma) \notag \\
+&= -\frac{1}{2} \ln(2\pi) - \ln(\tilde{\sigma}) - \frac{1}{2 \tilde{\sigma}^2} \sum_{i=1}^n \left[ X_i^B - X_{i-1}^B - \theta (1 - e^{-\mu \Delta t}) \right]^2
+\end{align}
+where \( \Delta t \) is the time step between observations. The parameters are estimated by maximizing this likelihood function over the historical price data.\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+The OU parameters estimated based on the historical data are the following:
+\begin{itemize}
+    \item $\mu = 0.01$ \quad (mean reversion speed)
+    \item $\theta = 150$ \quad (long-term mean price)
+    \item $\sigma = 2$ \quad (volatility)
+\end{itemize}
+
+\subsection*{Optimization of B}
+The optimization of the parameter \( B \) is integral to constructing a mean-reverting portfolio. The portfolio value \( X_t \) is defined as a linear combination of two assets, \( S_1 \) and \( S_2 \), with a ratio \( B \):
+\begin{equation}
+X_t = S_1(t) - B S_2(t)
+\end{equation}
+The optimal \( B \) is determined by maximizing the log-likelihood of fitting the portfolio values to the OU process. This involves finding the value of \( B \) that best aligns the portfolio with the mean-reverting dynamics described by the OU model. The optimization is typically done using a lookback window, as shown in the formula:
+\begin{equation}
+\hat{B} = \arg \max_{B} \left\{ \frac{1}{n} \sum_{i=1}^{n} \ln \mathcal{L} \left( X_{t_i} | X_{t_{i-1}}, \theta, \mu, \sigma \right) \right\}
+\end{equation} \footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+For the USDCHF/GC pair, the optimal value of \( B \) is calculated as follows:
+\begin{itemize}
+    \item \textbf{USDCHF/GC:} \( B = -0.005 \)
+\end{itemize}
+
+This value of \( B \) is used to construct a mean-reverting portfolio between the USD/CHF exchange rate and the price of Gold.
+
+\subsection*{Entry and Exit Levels}
+Using the estimated parameters, the script calculates optimal entry ($a^*$) and exit ($b^*$) levels. These levels determine when to open and close positions based on the mean-reversion principle.
+
+--------------------\\
+The strategy defines specific entry and exit levels to execute trades based on deviations from the mean. The entry signal is generated when the price deviates significantly below the mean, while the exit signal is triggered when the price reverts above the mean. The levels are defined in terms of standard deviations \( \sigma \) from the mean \( \mu \):
+
+\begin{equation}
+\text{Entry Level} = \mu - k \sigma
+\end{equation}
+
+\begin{equation}
+\text{Exit Level} = \mu + k \sigma
+\end{equation}
+
+where \( k \) is a threshold parameter that determines the sensitivity of the entry and exit signals. The optimal exit level \( b \) is further refined by solving the optimal stopping problem:
+
+\begin{equation}
+b = \arg \max_x \left\{ \mathbb{E} \left[ e^{-r \tau} (X_\tau - c) \right] \right\}
+\end{equation}
+
+where \( r \) is the discount rate, \( \tau \) is the stopping time, and \( c \) is the cost associated with trading.
+
+----------------------------------\\
+
+Using the estimated parameters, the script calculates the optimal entry ($a^*$) and exit ($b^*$) levels:
+
+\begin{itemize}
+    \item $a^* = 145$ \quad (entry level)
+    \item $b^* = 155$ \quad (exit level)
+\end{itemize}
+
+
+
+\end{document}
