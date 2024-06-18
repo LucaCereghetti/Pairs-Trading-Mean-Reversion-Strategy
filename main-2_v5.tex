@@ -74,27 +74,59 @@ where:
     \item \( \epsilon_t \) is the white noise error term.
 \end{itemize}
 
-The null hypothesis (\(H_0\)) of the ADF test is that the time series has a unit root, implying it is non-stationary. The alternative hypothesis (\(H_1\)) is that the time series is stationary.
+The null hypothesis (\(H_0\)) of the ADF test is that the time series has a unit root, implying it is non-stationary. The alternative hypothesis (\(H_1\)) is that the time series is stationary\footnote{Source: Rizwan Mushtaq, \textit{Testing Time Series Data For Stationarity}, 2011.}.
 
 \subsection*{Test Statistic and Interpretation}
-The key metric in the ADF test is the test statistic, which is compared against critical values at various significance levels (1\%, 5\%, and 10\%). The p-value is also computed to assess the significance of the test. If the p-value is below a certain threshold (commonly 0.05), the null hypothesis is rejected, indicating that the series is stationary.
-
-\subsection*{Source and Further Reading}
-For a more comprehensive understanding of the ADF test, refer to the seminal work by Dickey and Fuller:
-\begin{quote}
-Dickey, D. A., \& Fuller, W. A. (1979). \textit{Distribution of the Estimators for Autoregressive Time Series with a Unit Root}. Journal of the American Statistical Association, 74(366), 427-431.
-\end{quote}
+The key metric in the ADF test is the test statistic, which is compared against critical values at various significance levels (1\%, 5\%, and 10\%). The p-value is also computed to assess the significance of the test. If the p-value is below a certain threshold (commonly 0.05), the null hypothesis is rejected, indicating that the series is stationary\footnote{Source: Rizwan Mushtaq, \textit{Testing Time Series Data For Stationarity}, 2011.}.
 
 \subsection*{Results}
-Running the code these are the results:
-\begin{figure}[h]
+Running the code provides ADF test results for each time series. If the p-value is below 0.05, the series is considered stationary; otherwise, it is non-stationary:
+\begin{table}[h]
     \centering
-    \includegraphics[width=0.7\textwidth]{C:/Users/lucac/Documents/USI/Master/2nd semester/Programming/Project - Algotrading/Sources/image/ADF.jpg}
-    \caption{The Augmented Dickey-Fuller (ADF) test result.}
-    \label{fig:ADF}
-\end{figure}
+    \begin{tabular}{|c|c|c|}
+        \hline
+        \textbf{Series} & \textbf{p-value} & \textbf{Stationarity} \\
+        \hline
+        GSPC & 0.292718 & Non-stationary \\
+        \hline
+        USDJPY=X & 0.268162 & Non-stationary \\
+        \hline
+        AUDJPY=X & 0.996628 & Non-stationary \\
+        \hline
+        SI=F & 0.887131 & Non-stationary \\
+        \hline
+        USO & 0.233589 & Non-stationary \\
+        \hline
+        N225 & 0.043956 & Stationary \\
+        \hline
+        USDCAD=X & 0.231536 & Non-stationary \\
+        \hline
+        USDCHF=X & 0.209774 & Non-stationary \\
+        \hline
+        C & 0.706181 & Non-stationary \\
+        \hline
+        GS & 0.956621 & Non-stationary \\
+        \hline
+        AAPL & 0.678282 & Non-stationary \\
+        \hline
+        CL=F & 0.194642 & Non-stationary \\
+        \hline
+        GC=F & 0.875268 & Non-stationary \\
+        \hline
+        META & 0.142244 & Non-stationary \\
+        \hline
+    \end{tabular}
+    \caption{Augmented Dickey-Fuller (ADF) test results for the series.}
+    \label{tab:ADF_results}
+\end{table}
+The analysis reveals that most of the financial time series examined are non-stationary, as evidenced by p-values exceeding 0.05 for the majority of assets. The sole exception is the Nikkei 225, which is stationary. Consequently, it will not be included in the CADF test, which is designed exclusively for non-stationary variables.
+\clearpage
 
-The majority of the financial time series tested are non-stationary, as indicated by high p-values (greater than 0.05) across most assets. 
+
+
+
+
+
 
 \section*{Cointegrated Augmented Dickey-Fuller (CADF) Test}
 In this section, we apply the Cointegrated Augmented Dickey-Fuller (CADF) test to each pair of assets to assess their cointegration. Cointegration analysis is critical for understanding long-term equilibrium relationships between non-stationary time series, which is essential for strategies such as pairs trading.
@@ -127,13 +159,34 @@ For further details on the CADF test, refer to \textcite{engle1987cointegration}
 
 \subsection*{Results}
 Running the code these are the results:
-\begin{figure}[h]
+
+\begin{table}[h!]
     \centering
-    \includegraphics[width=0.7\textwidth]{C:/Users/lucac/Documents/USI/Master/2nd semester/Programming/Project - Algotrading/Sources/image/ADF.jpg}
-    
-    \caption{Cointegrated Augmented Dickey-Fuller (CADF) test result.}
-    \label{fig:ADF}
-\end{figure}
+    \begin{tabular}{|l|c|c|c|}
+        \hline
+        \textbf{Pairs} & \textbf{Test Statistic} & \textbf{p-value} & \textbf{Interpretation} \\
+        \hline
+        USDJPY\_X / N225 & -1.019 & 0.899169 & Not cointegrated \\
+        \hline
+        USDCAD\_X / CL=F & -0.650 & 0.951786 & Not cointegrated \\
+        \hline
+        CL=F / USO & -0.208 & 0.931990 & Not cointegrated \\
+        \hline
+        GC=F / SI=F & -1.244 & 0.845952 & Not cointegrated \\
+        \hline
+        AUDJPY=X / GSPC & -0.795 & 0.935377 & Not cointegrated \\
+        \hline
+        USDCHF=X / GC=F & -3.959 & 0.008211 & Cointegrated \\
+        \hline
+        C / GS & -1.941 & 0.559243 & Not cointegrated \\
+        \hline
+        AAPL / META & -1.671 & 0.690029 & Not cointegrated \\
+        \hline
+    \end{tabular}
+    \caption{ADF Test Results for Various Asset Pairs}
+    \label{tab:adf_results}
+\end{table}
+
 
 Most of the pairs tested do not show significant evidence of cointegration, with the exception of the USD/CHF and Gold Futures pair, which demonstrates a strong long-term equilibrium relationship. This result is important for the development of trading strategies based on cointegration, as only cointegrated pairs offer opportunities to exploit such stable relationships. Therefore, for most of the pairs analyzed, other trading methodologies may be more appropriate.
 
