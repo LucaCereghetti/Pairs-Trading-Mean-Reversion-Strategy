@@ -376,7 +376,27 @@ For the \textbf{second asset}, adjust the exit signal based on the pair ratio \(
 
 Upon meeting exit conditions, the strategy liquidates positions by selling the long in \( S1 \) and covering the short in \( S2 \), optimizing the capture of profits.
 
+\section{BACKTESTING OF THE STRATEGY}
 
+Before proceeding with our trading algorithm, we conducted a thorough backtest. The backtest involved estimating the parameters using minute-level data from the entire month of May. As previously explained, we estimated the parameters as of May 31, 2024. The estimated parameters are:
+
+\begin{itemize}
+    \item \( \mu = 0.1789 \)
+    \item \( \theta = -172.8241 \)
+    \item \( \sigma = 0.0819 \)
+    \item \( B = 0.0744 \)
+    \item \( b = -172.4148 \)
+\end{itemize}
+
+Using these parameters, we tested the strategy with an initial capital of 100,000 CHF, resulting in a final value of 102,000 CHF.
+The return.....etc.
+
+\section{HOW TO USE THE STRATEGY IN A LIVE ACCOUNTS}
+It is crucial to follow two main steps:
+
+\textbf{Step 1:} Estimate the parameters \( \mu \), \( \theta \), \( \sigma \), \( B \), and the optimal exit level (\( b \)) for today using minute-level data from the past 30 days.
+
+\textbf{Step 2:} After estimating these parameters, connect the code to Interactive Brokers (IBKR) to access live market data. The algorithm will then autonomously monitor and manage positions, ensuring the strategy is executed in real-time.
 
 
 
