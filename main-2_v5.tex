@@ -27,7 +27,7 @@ We decided to analyze the asset data found in the paper "On the Efficacy of Opti
 \begin{itemize}
     \item \textbf{USDJPY / NK}: This trading strategy relies on the positive correlation between the USD/JPY exchange rate and the Nikkei 225 index. Japan's economy is heavily reliant on exports, so when the Japanese yen strengthens against the US dollar (i.e., USDJPY falls), the Nikkei 225 index is likely to decline due to reduced export competitiveness. Conversely, a weakening Nikkei, often seen as a risk sentiment indicator, typically leads to a stronger yen, causing USDJPY to drop.
     \item \textbf{USDCAD / CL}: Canada is one of the world's top oil producers. There is a positive correlation between the price of crude oil and the value of the Canadian dollar. When oil prices rise (or fall), the Canadian dollar tends to appreciate (or depreciate), leading to a decrease (or increase) in the USD/CAD exchange rate.
-    \item \textbf{CL / USO}: The United States Oil Fund (USO) is a major ETF that holds futures contracts on West Texas Intermediate (WTI) crude oil. As it tracks the price movements of these futures, USO and crude oil futures prices generally exhibit a strong positive correlation.
+    \item \textbf{CL / USO}: The United States Oil Fund (USO) is a major ETF that holds futures contracts on West Texas Intermediate (WTI) crude oil. As it tracks the price movements of these futures, USO and crude oil futures (CL) prices generally exhibit a strong positive correlation.
     \item \textbf{GC / SI}: This pair involves trading between gold (GC) and silver (SI) spot prices. Both metals often move in tandem due to their common roles as safe-haven assets and inflation hedges, making this pair a classic case for analyzing relative metal pricing.
     \item \textbf{AUDJPY / SPX}: This strategy involves trading between the AUD/JPY exchange rate, which is often considered a risk-on currency pair, and the S\&P 500 (SPX) futures, a benchmark for US equity markets. The S\&P 500 is widely used as an indicator of general investor sentiment towards risk.
     \item \textbf{USDCHF / GC}: The Swiss National Bank holds a significant portion of its reserves in gold, implying a correlation between the Swiss franc and gold prices. When gold prices rise, the Swiss franc tends to strengthen (resulting in a decrease in USD/CHF), and vice versa.
@@ -36,9 +36,8 @@ We decided to analyze the asset data found in the paper "On the Efficacy of Opti
 \end{itemize}
 Assets taken from\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.
 
-\subsection*{Data Connect to IBKR}
-Data were taken from Interactive Brokers Trader Workstation (IBKR TWS) using the \texttt{ib\_insync} library.
-The script fetches historical price data for the above mentioned specified assets over the past 5 months from 01.01.2024 to 31.05.2024, with minutes intervals. This data is used for parameter estimation and to check trading conditions.
+\subsection*{Data Connection to Yahoo Finance}
+Data were retrieved from Yahoo Finance using the \texttt{yfinance} library. The script fetches historical price data for the specified assets over the past five months, from 01.01.2024 to 31.05.2024, with hourly intervals. This data is used to assess the cointegration between assets.
 \clearpage
 
 
@@ -87,21 +86,21 @@ Running the code provides ADF test results for each time series. If the p-value 
         \hline
         \textbf{Series} & \textbf{p-value} & \textbf{Stationarity} \\
         \hline
-        GSPC & 0.292718 & Non-stationary \\
+        SPX & 0.292718 & Non-stationary \\
         \hline
-        USDJPY=X & 0.268162 & Non-stationary \\
+        USDJPY & 0.268162 & Non-stationary \\
         \hline
-        AUDJPY=X & 0.996628 & Non-stationary \\
+        AUDJPY & 0.996628 & Non-stationary \\
         \hline
-        SI=F & 0.887131 & Non-stationary \\
+        SI & 0.887131 & Non-stationary \\
         \hline
         USO & 0.233589 & Non-stationary \\
         \hline
-        N225 & 0.043956 & Stationary \\
+        NK & 0.043956 & Stationary \\
         \hline
-        USDCAD=X & 0.231536 & Non-stationary \\
+        USDCAD & 0.231536 & Non-stationary \\
         \hline
-        USDCHF=X & 0.209774 & Non-stationary \\
+        USDCHF & 0.209774 & Non-stationary \\
         \hline
         C & 0.706181 & Non-stationary \\
         \hline
@@ -109,9 +108,9 @@ Running the code provides ADF test results for each time series. If the p-value 
         \hline
         AAPL & 0.678282 & Non-stationary \\
         \hline
-        CL=F & 0.194642 & Non-stationary \\
+        CL & 0.194642 & Non-stationary \\
         \hline
-        GC=F & 0.875268 & Non-stationary \\
+        GC & 0.875268 & Non-stationary \\
         \hline
         META & 0.142244 & Non-stationary \\
         \hline
@@ -166,17 +165,17 @@ Running the code these are the results:
         \hline
         \textbf{Pairs} & \textbf{Test Statistic} & \textbf{p-value} & \textbf{Interpretation} \\
         \hline
-        USDJPY\_X / N225 & -1.019 & 0.899169 & Not cointegrated \\
+        USDJPY / NK & -1.019 & 0.899169 & Not cointegrated \\
         \hline
-        USDCAD\_X / CL=F & -0.650 & 0.951786 & Not cointegrated \\
+        USDCAD / CL & -0.650 & 0.951786 & Not cointegrated \\
         \hline
-        CL=F / USO & -0.208 & 0.931990 & Not cointegrated \\
+        CL / USO & -0.208 & 0.931990 & Not cointegrated \\
         \hline
-        GC=F / SI=F & -1.244 & 0.845952 & Not cointegrated \\
+        GC / SI & -1.244 & 0.845952 & Not cointegrated \\
         \hline
-        AUDJPY=X / GSPC & -0.795 & 0.935377 & Not cointegrated \\
+        AUDJPY / SPX & -0.795 & 0.935377 & Not cointegrated \\
         \hline
-        USDCHF=X / GC=F & -3.959 & 0.008211 & Cointegrated \\
+        USDCHF / GC & -3.959 & 0.008211 & Cointegrated \\
         \hline
         C / GS & -1.941 & 0.559243 & Not cointegrated \\
         \hline
@@ -210,18 +209,21 @@ Most of the pairs tested do not show significant evidence of cointegration, with
 
 
 
-\section{Entry - Exit Strategy Overview}
-The mean-reversion trading strategy implemented in the provided script leverages the Ornstein-Uhlenbeck (OU) process to model the statistical behavior of financial time series, such as stock prices. This approach captures the tendency of asset prices to revert to their long-term mean, allowing the strategy to exploit temporary deviations. By identifying and trading these deviations, the strategy aims to capitalize on the expected price corrections over time.
-We take the past data of the last ten days to estimate the parameters.
-
-\section*{Key Concepts of the Strategy}
-\subsection*{Mean-Reversion}
+\section{PARAMETERS ESTIMATION}
 Mean reversion is a financial theory suggesting that asset prices and historical returns eventually revert to their long-term average levels. This phenomenon is frequently observed in various financial markets where prices tend to fluctuate around a long-term mean or equilibrium level. The key assumption is that deviations from the mean are temporary and will eventually correct, allowing for potential trading opportunities. Mathematically, mean reversion can be represented as:
 \begin{equation}
 X_t = \mu + \phi (X_{t-1} - \mu) + \epsilon_t
 \end{equation}
 where \( X_t \) is the price at time \( t \), \( \mu \) is the long-term mean, \( \phi \) is the mean-reversion speed, and \( \epsilon_t \) is a white noise error term.
-SOURCE!!!
+SOURCE!!!\\
+
+
+The mean-reversion trading strategy implemented in the provided script leverages the Ornstein-Uhlenbeck (OU) process to model the statistical behavior of financial time series, such as stock prices. This approach captures the tendency of asset prices to revert to their long-term mean, allowing the strategy to exploit temporary deviations. By identifying and trading these deviations, the strategy aims to capitalize on the expected price corrections over time.
+We take the past data of the last ten days to estimate the parameters.
+
+\subsection*{Data Connect to IBKR}
+Data were taken from Interactive Brokers Trader Workstation (IBKR TWS) using the \texttt{ib\_insync} library.
+The script fetches historical price data for USD/CHF and GC (Gold Futures) over the past 10 days, with minute intervals. This data is used for parameter estimation.
 
 \subsection*{Definition of portfolio}
 We start constructing a portfolio by holding a risky asset $S^1$ and shorting $B$ shares of another risky asset $S^2$. This resulting in
@@ -253,9 +255,9 @@ where \( \Delta t \) is the time step between observations. The parameters are e
 
 The OU parameters estimated based on the historical data are the following:
 \begin{itemize}
-    \item $\mu = 0.01$ \quad (mean reversion speed)
-    \item $\theta = 150$ \quad (long-term mean price)
-    \item $\sigma = 2$ \quad (volatility)
+    \item $\mu = 0.01602$ \quad (mean reversion speed)
+    \item $\theta = -590.8839$ \quad (long-term mean price)
+    \item $\sigma = 0.3190$ \quad (volatility)
 \end{itemize}
 
 \subsection*{Optimization of B}
@@ -270,41 +272,113 @@ The optimal \( B \) is determined by maximizing the log-likelihood of fitting th
 
 For the USDCHF/GC pair, the optimal value of \( B \) is calculated as follows:
 \begin{itemize}
-    \item \textbf{USDCHF/GC:} \( B = -0.005 \)
+    \item \textbf{USDCHF/GC:} \( B = 0.2553 \)
 \end{itemize}
 
-This value of \( B \) is used to construct a mean-reverting portfolio between the USD/CHF exchange rate and the price of Gold.
+This value of \( B \) is used to construct a mean-reverting portfolio between the USD/CHF exchange rate and the price of Gold.\\
 
-\subsection*{Entry and Exit Levels}
-Using the estimated parameters, the script calculates optimal entry ($a^*$) and exit ($b^*$) levels. These levels determine when to open and close positions based on the mean-reversion principle.
+IMPORTANT: The portfolio series need to be updated periodically using the optimized pair ratio.
 
---------------------\\
-The strategy defines specific entry and exit levels to execute trades based on deviations from the mean. The entry signal is generated when the price deviates significantly below the mean, while the exit signal is triggered when the price reverts above the mean. The levels are defined in terms of standard deviations \( \sigma \) from the mean \( \mu \):
+\section{ENTRY AND OPTIMIZED EXIT}
+In this section, we will detail the methodology for opening and closing positions within our trading strategy.
+\section*{Entry Condition}
 
-\begin{equation}
-\text{Entry Level} = \mu - k \sigma
-\end{equation}
+At every hour, the strategy evaluates whether to generate an entry signal. The entry signal, denoted as \( \text{Sig}_{S1} \), is triggered if the portfolio value \( X_t \) falls below the moving average minus one standard deviation. Mathematically, this condition is expressed as:
 
-\begin{equation}
-\text{Exit Level} = \mu + k \sigma
-\end{equation}
+\[
+\text{Sig}_{S1} = 
+\begin{cases} 
+1, & \text{if } X_t < \text{MA}(X_t) - \sigma(X_t) \\
+0, & \text{otherwise}
+\end{cases}
+\]
 
-where \( k \) is a threshold parameter that determines the sensitivity of the entry and exit signals. The optimal exit level \( b \) is further refined by solving the optimal stopping problem:
+This criterion indicates that the portfolio value is substantially lower than its historical average, suggesting a potential opportunity for mean reversion.
 
-\begin{equation}
-b = \arg \max_x \left\{ \mathbb{E} \left[ e^{-r \tau} (X_\tau - c) \right] \right\}
-\end{equation}
 
-where \( r \) is the discount rate, \( \tau \) is the stopping time, and \( c \) is the cost associated with trading.
+\subsection*{Entry Signal Execution}
+Upon the condition \( \text{Sig}_{S1} = 1 \), the strategy proceeds to enter a position. This entails taking a long position in the first asset \( S1 \) and a corresponding short position in the second asset \( S2 \), adjusted by the optimized pair ratio \( B \). The corresponding signal for the \textbf{second asset} is given by:
 
-----------------------------------\\
+\[
+\text{Sig}_{S2} = -B \cdot \text{Sig}_{S1}
+\]
 
-Using the estimated parameters, the script calculates the optimal entry ($a^*$) and exit ($b^*$) levels:
+This strategy maintains market neutrality and capitalizes on mean reversion by entering positions when the portfolio is undervalued. It leverages expected price corrections towards the historical mean to maximize returns.
 
+\section*{Optimal Exit Level $b_t$}
+To find the optimal exit point we have to find before the optimal exit level, \( b_t \), that is essential for maximizing trading strategy profits. The steps to determine and utilize this level are as follows:\\
+
+To find the optimal exit level, solve an optimal stopping problem. This aims to maximize the expected payoff by exiting at the most favorable time:
+
+\[
+V(x) = \sup_{\tau} \mathbb{E} \left[ e^{-r \tau} (X_{\tau} - c) \right]
+\]
+
+where \( r \) is the discount rate, and \( c \) represents costs related to holding or exiting a position.
+
+The optimal exit level \( b_t \) is found by solving:
+
+\[
+F(b) = (b - c) F'(b)
+\]
+
+Here:
+
+\[
+F(x) = \int_0^\infty u^{\frac{2\mu}{\sigma^2} - 1} e^{\sqrt{\frac{2\mu}{\sigma^2}} (\theta - x) u - \frac{u^2}{2}} du
+\]
+
+Using numerical methods, approximate \( F(x) \) and its derivative to find \( b \). This level \( b_t \) is a dynamic threshold adjusting to market conditions, ensuring exits at optimal points.
+
+\section*{Exit Condition}
+
+The strategy uses the optimal exit level \( b_t \) to decide when to exit positions to maximize returns. Hourly, the strategy checks if the portfolio value \( X_t \) exceeds the optimal exit level \( b_t \) or the moving average plus one standard deviation. The exit signals are defined as follows:
+
+
+
+1. **Moving Average Exit**:
+    - Exit if \( X_t \) exceeds the moving average plus one standard deviation:
+    \[
+    \text{Sig}_{S1} = 
+    \begin{cases} 
+    0, & \text{if } X_t > \text{MA}(X_t) + \sigma(X_t) \\
+    \text{Sig}_{S1, t-1}, & \text{otherwise}
+    \end{cases}
+    \]
+
+2. **Optimal Exit Level**:
+    - Exit if \( X_t \) exceeds the optimal exit level \( b_t \):
+    \[
+    \text{Sig}_{S1} = 
+    \begin{cases} 
+    0, & \text{if } X_t > b_t \\
+    \text{Sig}_{S1, t-1}, & \text{otherwise}
+    \end{cases}
+    \]
+The optimal exit level \( b_t \) helps to:
 \begin{itemize}
-    \item $a^* = 145$ \quad (entry level)
-    \item $b^* = 155$ \quad (exit level)
-\end{itemize}
+
+    \item Reduce trade frequency and transaction costs.
+    \item Ensure exits at the best possible prices, maximizing returns.
+\end{itemize}\vspace{1em}
+
+For the \textbf{second asset}, adjust the exit signal based on the pair ratio \( B_t \):
+\[
+\text{Sig}_{S2} = 
+\begin{cases} 
+0, & \text{if } \text{Sig}_{S1} = 0 \\
+-\text{Sig}_{S2, t-1}, & \text{otherwise}
+\end{cases}
+\]
+
+
+\subsection*{Exit Signal Execution}
+
+Upon meeting exit conditions, the strategy liquidates positions by selling the long in \( S1 \) and covering the short in \( S2 \), optimizing the capture of profits.
+
+
+
+
 
 
 
