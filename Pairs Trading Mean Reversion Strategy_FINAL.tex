@@ -1,0 +1,525 @@
+\documentclass{article}
+\usepackage{hyperref}  % Enables clickable links and handles URLs
+\usepackage{url}       % Allows the use of the \url command
+\usepackage{graphicx}  % Required for inserting images
+\usepackage{amsmath, amssymb, amsthm}
+
+\title{Pairs Trading Mean Reversion Strategy}
+\author{Francesco Bondio, Luca Cereghetti, Matteo Rampazzo, Dario Vicedomini}
+\date{June 2024}
+
+\begin{document}  % Begin the document
+\maketitle  % Display the title, author, and date
+% Your document content goes here
+
+\begin{center}
+  \small \href{https://github.com/matteramp/Programming-trading}{https://github.com/matteramp/Programming-trading}
+\end{center}
+
+
+\section{INTRODUCTION}
+Pairs trading is a well-established speculative investment strategy in the financial markets, gaining prominence in the 1980s. Today, it is commonly utilized by hedge funds and institutional investors as a long/short equity strategy. Recent studies have expanded the original analysis of pairs trading to include more contemporary data, demonstrating both economically and statistically significant profits using a straightforward pairs trading approach. 
+
+Typically regarded as a form of technical analysis, pairs trading aims to identify the relative overvaluation and undervaluation between two closely related stocks that share a long-term relationship. Relative mispricing occurs when the spread between the two stocks deviates from its equilibrium, and excess returns can be generated if the pair is mean-reverting—meaning any deviations are temporary and will return to equilibrium after a period of adjustment. In such cases, the strategy involves simultaneously shorting the relatively overvalued stock and going long on the relatively undervalued stock.\footnote{Source: Rong Qi Liew, Yuan Wu, \textit{Pairs trading: A copula approach}, 2022.}. By working with intraday prices, we fit the most cointegrated pair to an Ornstein-Uhlenbeck (OU) process using maximum likelihood estimation (MLE). Subsequently, we employ an optimized exit rule to adjust positions, aiming to enhance mean reversion.
+
+\section*{Asset Pairs and data}
+Cointegration is a statistical method that identifies long-term equilibrium relationships between non-stationary time series, such as the prices of different assets. It suggests that certain pairs of assets move together over time, and any deviations from this relationship are temporary imbalances that can present trading opportunities. The cointegration approach involves three key steps: selecting potential asset pairs, analyzing their tradability, and setting criteria for entering and exiting trades based on the observed equilibrium relationship. This method helps traders exploit predictable patterns for profit.\footnote{Source: Tetiana Lemishko, Alexandre Landi, Juliana Caicedo-Llano, \textit{Cointegration-Based Strategies in Forex Pair Trading}, 2024.}
+Assets can be cointegrated because they are influenced by common factors such as economic conditions, market dynamics, trade relationships, or industry-specific forces. These shared influences cause their prices to move together over the long term, reflecting a stable and predictable relationship.\\
+
+The following are examples of asset pairs that may exhibit cointegration:
+\begin{itemize}
+    \item \textbf{USDCAD / CL}:Canada is one of the world's top oil producers. There is a positive correlation between the price of crude oil and the value of the Canadian dollar. When oil prices rise (or fall), the Canadian dollar tends to appreciate (or depreciate), leading to a decrease (or increase) in the USD/CAD exchange rate. 
+    \item \textbf{CL / USO}: The United States Oil Fund (USO) is a major ETF that holds futures contracts on West Texas Intermediate (WTI) crude oil. As it tracks the price movements of these futures, USO and crude oil futures (CL) prices generally exhibit a strong positive correlation. 
+    \item \textbf{C / GS}: Citigroup (C) and Goldman Sachs (GS) are two major financial institutions in the banking sector. These large-cap stocks are often subject to similar market forces, which can create opportunities for pairs trading based on their relative performance.\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.
+\end{itemize}
+As we are currently utilizing demo accounts on IBKR, we are restricted from trading futures and indices. Consequently, we have elected to concentrate exclusively on foreign exchange (FX) pairs. We have commenced an analysis of the stationarity of the following pairs, and for those identified as non-stationary, we are further exploring their potential for cointegration:\\
+
+GBPCHF (British Pound / Swiss Franc), EURGBP (Euro / British Pound), GBPUSD (British Pound / US Dollar), AUDJPY (Australian Dollar / Japanese Yen), USDCAD (US Dollar / Canadian Dollar), GBPJPY (British Pound / Japanese Yen), EURAUD (Euro / Australian Dollar), USDSEK (US Dollar / Swedish Krona), EURCAD (Euro / Canadian Dollar), USDTRY (US Dollar / Turkish Lira), CHFJPY (Swiss Franc / Japanese Yen), AUDUSD (Australian Dollar / US Dollar), USDCHF (US Dollar / Swiss Franc), EURTRY (Euro / Turkish Lira), USDNOK (US Dollar / Norwegian Krone), EURCHF (Euro / Swiss Franc), USDSGD (US Dollar / Singapore Dollar), USDHKD (US Dollar / Hong Kong Dollar), NZDUSD (New Zealand Dollar / US Dollar), CADJPY (Canadian Dollar / Japanese Yen), EURJPY (Euro / Japanese Yen), EURNZD (Euro / New Zealand Dollar), GBPAUD (British Pound / Australian Dollar), GBPCAD (British Pound / Canadian Dollar), AUDNZD (Australian Dollar / New Zealand Dollar), USDJPY (US Dollar / Japanese Yen), EURUSD (Euro / US Dollar), and NZDJPY (New Zealand Dollar / Japanese Yen).
+
+\subsection*{Data Connection to Interactive Brokers}
+Data were retrieved from Interactive Brokers (IBKR) using the \texttt{ib\_insync} library. The script establishes a connection to the IBKR TWS or Gateway to fetch historical price data for the specified currency pairs over the past five months, from January 1, 2024, to May 31, 2024, with hourly intervals. This data is used to assess the cointegration between assets.
+
+\section{PRELIMINARY TEST}
+Before implementing the strategy, it is crucial to select assets that exhibit cointegration with one another. To achieve this, we utilize two models: the Augmented Dickey-Fuller (ADF) test and the Cointegrated Augmented Dickey-Fuller (CADF) test, as detailed below:
+
+\section*{Augmented Dickey-Fuller (ADF) test}
+The Augmented Dickey-Fuller (ADF) test is a widely utilized statistical method to assess whether a time series is stationary. A stationary time series maintains consistent properties over time, including mean, variance, and autocorrelation structure. Stationarity is critical in financial time series analysis for modeling and forecasting, especially for identifying mean-reverting behaviors.
+We are applying the ADF test to each asset to determine its stationarity, which is essential for subsequent analyses, such as cointegration testing and the formulation of robust trading strategies. This section focuses on verifying the stationarity of each asset individually, as the concept of cointegration is applicable only to non-stationary time series.
+
+\subsection*{Mathematical Foundation}
+The ADF test is based on the following regression model:
+\[
+\Delta y_t = \alpha + \beta t + \gamma y_{t-1} + \sum_{i=1}^p \delta_i \Delta y_{t-i} + \epsilon_t
+\]
+where:
+\begin{itemize}
+    \item \( y_t \) is the time series.
+    \item \( \Delta y_t \) is the first difference of \( y_t \), i.e., \( y_t - y_{t-1} \).
+    \item \( \alpha \) is a constant term.
+    \item \( \beta t \) represents a deterministic trend.
+    \item \( \gamma \) is the coefficient of the lagged level of the series.
+    \item \( p \) is the number of lagged difference terms.
+    \item \( \delta_i \) are coefficients of the lagged differences.
+    \item \( \epsilon_t \) is the white noise error term.
+\end{itemize}
+
+The null hypothesis (\(H_0\)) of the ADF test is that the time series has a unit root, implying it is non-stationary. The alternative hypothesis (\(H_1\)) is that the time series is stationary\footnote{Source: Rizwan Mushtaq, \textit{Testing Time Series Data For Stationarity}, 2011.}.
+
+\subsection*{Test Statistic and Interpretation}
+The key metric in the ADF test is the test statistic, which is compared against critical values at various significance levels (1\%, 5\%, and 10\%). The p-value is also computed to assess the significance of the test. If the p-value is below a certain threshold (commonly 0.05), the null hypothesis is rejected, indicating that the series is stationary \footnote{Source: Rizwan Mushtaq, \textit{Testing Time Series Data For Stationarity}, 2011.}.
+
+\subsection*{Results}
+Running the code yields ADF test results for each time series. If the p-value is below 0.05, the series is considered stationary; otherwise, it is non-stationary.
+
+The analysis reveals that many of the financial time series examined are non-stationary, as indicated by p-values exceeding the 0.05 threshold. This necessitates further analysis for potential cointegration. Stationary pairs, such as GBPCHF, GBPUSD, and AUDUSD, will be excluded from the CADF test, which is designed for non-stationary variables.
+
+The non-stationary pairs identified for the CADF test to assess potential cointegration include EURGBP, AUDJPY, GBPJPY, CHFJPY, USDSGD, CADJPY, EURJPY, GBPCAD, USDJPY, and NZDJPY. These pairs will be analyzed for possible cointegration relationships to develop robust trading strategies.
+
+\begin{table}[h]
+    \centering
+    \begin{tabular}{|c|c|c|}
+        \hline
+        \textbf{Series} & \textbf{p-value} & \textbf{Stationarity} \\
+        \hline
+        GBPCHF & 0.048948 & Stationary \\
+        \hline
+        EURGBP & 0.085131 & Non-stationary \\
+        \hline
+        GBPUSD & 0.003858 & Stationary \\
+        \hline
+        AUDJPY & 0.602053 & Non-stationary \\
+        \hline
+        USDCAD & 0.025954 & Stationary \\
+        \hline
+        GBPJPY & 0.725736 & Non-stationary \\
+        \hline
+        EURAUD & 0.000402 & Stationary \\
+        \hline
+        USDSEK & 0.000006 & Stationary \\
+        \hline
+        EURCAD & 0.000088 & Stationary \\
+        \hline
+        USDTRY & 0.008232 & Stationary \\
+        \hline
+        CHFJPY & 0.926791 & Non-stationary \\
+        \hline
+        AUDUSD & 0.002425 & Stationary \\
+        \hline
+        USDCHF & 0.007920 & Stationary \\
+        \hline
+        EURTRY & 0.015150 & Stationary \\
+        \hline
+        USDNOK & 0.001562 & Stationary \\
+        \hline
+        EURCHF & 0.041691 & Stationary \\
+        \hline
+        USDSGD & 0.107929 & Non-stationary \\
+        \hline
+        USDHKD & 0.040253 & Stationary \\
+        \hline
+        NZDUSD & 0.000014 & Stationary \\
+        \hline
+        CADJPY & 0.743123 & Non-stationary \\
+        \hline
+        EURJPY & 0.714824 & Non-stationary \\
+        \hline
+        EURNZD & 0.000086 & Stationary \\
+        \hline
+        GBPAUD & 0.001020 & Stationary \\
+        \hline
+        GBPCAD & 0.059400 & Non-stationary \\
+        \hline
+        AUDNZD & 0.000009 & Stationary \\
+        \hline
+        USDJPY & 0.498531 & Non-stationary \\
+        \hline
+        EURUSD & 0.001800 & Stationary \\
+        \hline
+        NZDJPY & 0.940668 & Non-stationary \\
+        \hline
+    \end{tabular}
+    \caption{Augmented Dickey-Fuller (ADF) test results for the currency pairs.}
+    \label{tab:ADF_results}
+\end{table}
+\clearpage
+
+
+
+
+
+\section*{Cointegrated Augmented Dickey-Fuller (CADF) Test}
+In this section, we apply the Cointegrated Augmented Dickey-Fuller (CADF) test to each pair of assets to assess their cointegration. Cointegration analysis is critical for understanding long-term equilibrium relationships between non-stationary time series, which is essential for strategies such as pairs trading.
+
+\subsection{Mathematical Foundation}
+The CADF test extends the Augmented Dickey-Fuller (ADF) test by evaluating whether two or more non-stationary time series are cointegrated, implying they have a stable, long-term relationship despite individual stochastic trends. The mathematical foundation of the CADF test is built on the concept of cointegration.
+
+Given two time series \( X_t \) and \( Y_t \), they are considered cointegrated if there exists a linear combination \( Z_t = X_t - \beta Y_t \) that is stationary. The CADF test involves estimating the cointegration equation:
+\[
+Z_t = X_t - \beta Y_t + \epsilon_t
+\]
+where \( \epsilon_t \) is a stationary error term. We then test the null hypothesis that there is no cointegration (i.e., \( Z_t \) is non-stationary) against the alternative hypothesis of cointegration (i.e., \( Z_t \) is stationary) \footnote{Source: Bent E. Sørensen, \textit{ECONOMICS 266, Spring, 1997}, 2019.}.
+
+\subsection{Test Statistic Interpretation}
+The CADF test generates a test statistic \( \tau \) for the residuals \( \epsilon_t \) of the cointegration regression. The critical values for the test statistic depend on the sample size and the number of lags included in the model. If the test statistic \( \tau \) is less than the critical value at a chosen significance level (e.g., 5\%), the null hypothesis of no cointegration is rejected, indicating that the series are cointegrated.
+
+\[
+\tau = \frac{\hat{\beta}}{\text{SE}(\hat{\beta})}
+\]
+
+Here, \( \hat{\beta} \) is the estimated coefficient from the regression of \( X_t \) on \( Y_t \), and \( \text{SE}(\hat{\beta}) \) is its standard error \footnote{\url{https://www.quantstart.com/articles/Basics-of-Statistical-Mean-Reversion-Testing/} \newline Basics of Statistical Mean Reversion Testing}.
+
+
+\subsection*{Results}
+The majority of the pairs tested do not exhibit significant evidence of cointegration, as indicated by p-values exceeding the conventional threshold of 0.05. However, several pairs demonstrated a statistically significant cointegration relationship, suggesting a stable long-term equilibrium between them. This finding is crucial for developing trading strategies that leverage cointegration, as only cointegrated pairs present opportunities to exploit such stable relationships. For the pairs that are not cointegrated, alternative trading strategies may be more appropriate.
+
+Among the tested pairs, the three that show the strongest evidence of cointegration are as follows:
+
+\begin{enumerate}
+    \item \textbf{AUDJPY and CADJPY}: With a test statistic of -5.537 and a p-value of 0.000015, this pair demonstrates the most significant cointegration, indicating a robust long-term relationship.
+    \item \textbf{AUDJPY and GBPJPY}: This pair shows strong cointegration with a test statistic of -4.495 and a p-value of 0.001248, suggesting a significant equilibrium connection.
+    \item \textbf{AUDJPY and EURJPY}: Exhibiting a test statistic of -4.378 and a p-value of 0.001931, this pair is the third most cointegrated, indicating a notable long-term equilibrium.
+\end{enumerate}
+
+These results highlight the importance of selecting pairs with proven cointegration for strategies aiming to exploit stable relationships over time. The complete results are presented on the following page.\\
+
+For our trading strategy, we will proceed with the following pair: AUDJPY and CADJPY.
+
+
+\begin{table}[h!]
+    \centering
+    \begin{tabular}{|l|c|c|c|}
+        \hline
+        \textbf{Pairs} & \textbf{Test Statistic} & \textbf{p-value} & \textbf{Interpretation} \\
+        \hline
+        EURGBP / AUDJPY & -3.095 & 0.089215 & Not cointegrated \\
+        \hline
+        EURGBP / GBPJPY & -2.984 & 0.113947 & Not cointegrated \\
+        \hline
+        EURGBP / CHFJPY & -3.695 & 0.018600 & Cointegrated \\
+        \hline
+        EURGBP / USDSGD & -3.036 & 0.101963 & Not cointegrated \\
+        \hline
+        EURGBP / CADJPY & -3.025 & 0.104441 & Not cointegrated \\
+        \hline
+        EURGBP / EURJPY & -3.169 & 0.075293 & Not cointegrated \\
+        \hline
+        EURGBP / GBPCAD & -3.807 & 0.013284 & Cointegrated \\
+        \hline
+        EURGBP / USDJPY & -3.090 & 0.090239 & Not cointegrated \\
+        \hline
+        EURGBP / NZDJPY & -2.701 & 0.199289 & Not cointegrated \\
+        \hline
+        AUDJPY / GBPJPY & -4.495 & 0.001248 & Cointegrated \\
+        \hline
+        AUDJPY / CHFJPY & -4.084 & 0.005429 & Cointegrated \\
+        \hline
+        AUDJPY / USDSGD & -2.076 & 0.488836 & Not cointegrated \\
+        \hline
+        AUDJPY / CADJPY & -5.537 & 0.000015 & Cointegrated \\
+        \hline
+        AUDJPY / EURJPY & -4.378 & 0.001931 & Cointegrated \\
+        \hline
+        AUDJPY / GBPCAD & -1.956 & 0.551453 & Not cointegrated \\
+        \hline
+        AUDJPY / USDJPY & -3.183 & 0.072782 & Not cointegrated \\
+        \hline
+        AUDJPY / NZDJPY & -1.753 & 0.652324 & Not cointegrated \\
+        \hline
+        GBPJPY / CHFJPY & -4.172 & 0.004028 & Cointegrated \\
+        \hline
+        GBPJPY / USDSGD & -1.746 & 0.655673 & Not cointegrated \\
+        \hline
+        GBPJPY / CADJPY & -3.057 & 0.097355 & Not cointegrated \\
+        \hline
+        GBPJPY / EURJPY & -3.033 & 0.102483 & Not cointegrated \\
+        \hline
+        GBPJPY / GBPCAD & -1.652 & 0.698319 & Not cointegrated \\
+        \hline
+        GBPJPY / USDJPY & -2.475 & 0.290202 & Not cointegrated \\
+        \hline
+        GBPJPY / NZDJPY & -1.469 & 0.772781 & Not cointegrated \\
+        \hline
+        CHFJPY / USDSGD & -0.832 & 0.930339 & Not cointegrated \\
+        \hline
+        CHFJPY / CADJPY & -2.226 & 0.410821 & Not cointegrated \\
+        \hline
+        CHFJPY / EURJPY & -2.044 & 0.505404 & Not cointegrated \\
+        \hline
+        CHFJPY / GBPCAD & -1.012 & 0.900594 & Not cointegrated \\
+        \hline
+        CHFJPY / USDJPY & -1.600 & 0.720875 & Not cointegrated \\
+        \hline
+        CHFJPY / NZDJPY & -0.603 & 0.956164 & Not cointegrated \\
+        \hline
+        USDSGD / CADJPY & -2.592 & 0.239886 & Not cointegrated \\
+        \hline
+        USDSGD / EURJPY & -3.383 & 0.044304 & Cointegrated \\
+        \hline
+        USDSGD / GBPCAD & -3.410 & 0.041283 & Cointegrated \\
+        \hline
+        USDSGD / USDJPY & -3.133 & 0.081953 & Not cointegrated \\
+        \hline
+        USDSGD / NZDJPY & -2.662 & 0.213578 & Not cointegrated \\
+        \hline
+        CADJPY / EURJPY & -3.582 & 0.025796 & Cointegrated \\
+        \hline
+        CADJPY / GBPCAD & -1.736 & 0.660049 & Not cointegrated \\
+        \hline
+        CADJPY / USDJPY & -1.443 & 0.782238 & Not cointegrated \\
+        \hline
+        CADJPY / NZDJPY & -1.364 & 0.809589 & Not cointegrated \\
+        \hline
+        EURJPY / GBPCAD & -1.736 & 0.660365 & Not cointegrated \\
+        \hline
+        EURJPY / USDJPY & -2.349 & 0.349237 & Not cointegrated \\
+        \hline
+        EURJPY / NZDJPY & -1.502 & 0.760275 & Not cointegrated \\
+        \hline
+        GBPCAD / USDJPY & -3.470 & 0.035134 & Cointegrated \\
+        \hline
+        GBPCAD / NZDJPY & -3.115 & 0.085293 & Not cointegrated \\
+        \hline
+        USDJPY / NZDJPY & -1.919 & 0.570294 & Not cointegrated \\
+        \hline
+    \end{tabular}
+    \caption{CADF Test Results for Various Currency Pairs}
+    \label{tab:cadf_results}
+\end{table}
+
+
+\clearpage
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{PARAMETERS ESTIMATION}
+Mean reversion is a financial theory that suggests asset prices and returns will eventually revert to their long-term average levels. This phenomenon is commonly observed in financial markets where prices tend to oscillate around an average value. The key idea is that short-term deviations from this average will eventually correct themselves, presenting potential trading opportunities. The larger the deviation from the mean, the higher the likelihood that the asset's price will move back towards it in the future.\footnote{\url{https://www.investopedia.com/terms/m/meanreversion.asp} \newline What Is Mean Reversion, and How Do Investors Use It? by James Chen, reviewed by Gordon Scott.}
+
+The mean-reversion trading strategy in the provided script uses the Ornstein-Uhlenbeck (OU) process to model the behavior of asset prices like stocks. This approach takes advantage of the tendency of prices to return to their average by identifying and trading on temporary deviations.
+
+\subsection*{Data Connection to Interactive Brokers}
+
+Historical price data were obtained from Interactive Brokers Trader Workstation (IBKR TWS) using the \texttt{ib\_insync} library. The script retrieves data for the currency pairs AUDJPY and CADJPY over a 30-day period, spanning from May 1, 2024, to May 31, 2024, at 15-minute intervals. This data is utilized for parameter estimation in our analysis.
+
+
+\subsection*{Definition of portfolio}
+We start constructing a portfolio by holding a risky asset $S^1$ and shorting $B$ shares of another risky asset $S^2$. This resulting in
+\begin{equation}
+    X_t=S_t^1-BS_t^2
+\end{equation}
+In which $B$ is the pair ratio (which can be positive or negative), that determines how many units of the second asset $s^2$ are needed to offset or hedge one unit of the first asset $S^1$\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+For our trading strategy, we define the portfolio as follows:
+\begin{itemize}
+    \item $S_t^1$: AUDJPY (the first risky asset)
+    \item $S_t^2$: CADJPY (the second risky asset)
+\end{itemize}
+
+
+\subsection*{Ornstein-Uhlenbeck Process}
+The Ornstein-Uhlenbeck (OU) process is a continuous-time stochastic process used to model mean-reverting behavior in financial markets. It is particularly suitable for describing the dynamics of asset prices that exhibit tendencies to revert to a mean level. The OU process is defined by the following stochastic differential equation (SDE):
+\begin{equation}
+dX_t = \theta (\mu - X_t) dt + \sigma dW_t
+\end{equation}
+Here, \( \theta \) represents the rate of mean reversion, \( \mu \) is the long-term mean, \( \sigma \) is the volatility (the degree of variation or dispersion of the price), and \( W_t \) is a standard Wiener process (Brownian motion). The term \( \theta (\mu - X_t) \) drives the process towards the mean \( \mu \), while \( \sigma dW_t \) adds randomness to the movement of \( X_t \).\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.
+
+\subsection*{Parameters Estimation}
+Estimating the parameters \( \theta \), \( \mu \), and \( \sigma \) is crucial for accurately modeling the OU process. We estimate the parameters through maximum likelihood estimation, tracking the time series data for each portfolio. By maximizing the average log-likelihood $\ell(\theta, \mu, \sigma \mid X_{B_0}, X_{B_1}, \ldots, X_{B_n})$, we determine the parameters $\theta^*$, $\mu^*$, and $\sigma^*$, which in turn help us identify optimal entry and exit points for trades.
+\begin{align}
+\ell(\theta, \mu, \sigma \mid X_0^B, X_1^B, \ldots, X_n^B) &= \frac{1}{n} \sum_{i=1}^n \ln f^{OU}(X_i^B \mid X_{i-1}^B; \theta, \mu, \sigma) \notag \\
+&= -\frac{1}{2} \ln(2\pi) - \ln(\tilde{\sigma}) - \frac{1}{2 \tilde{\sigma}^2} \sum_{i=1}^n \left[ X_i^B - X_{i-1}^B - \theta (1 - e^{-\mu \Delta t}) \right]^2
+\end{align}
+where \( \Delta t \) is the time step between observations. The parameters are estimated by maximizing this likelihood function over the historical price data.\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+The OU parameters estimated based on the historical data are the following:
+\begin{itemize}
+    \item $\mu = 0.0000$ \quad (mean reversion speed)
+    \item $\theta = 94.2406$ \quad (long-term mean price)
+    \item $\sigma = 0.0010$ \quad (volatility)
+\end{itemize}
+
+\subsection*{Optimization of B}
+The optimization of the parameter \( B \) is integral to constructing a mean-reverting portfolio. The portfolio value \( X_t \) is defined as a linear combination of two assets, \( S_1 \) and \( S_2 \), with a ratio \( B \):
+\begin{equation}
+X_t = S_1(t) - B S_2(t)
+\end{equation}
+The optimal \( B \) is determined by maximizing the log-likelihood of fitting the portfolio values to the OU process. This involves finding the value of \( B \) that best aligns the portfolio with the mean-reverting dynamics described by the OU model. The optimization is typically done using a lookback window, as shown in the formula:
+\begin{equation}
+\hat{B} = \arg \max_{B} \left\{ \frac{1}{n} \sum_{i=1}^{n} \ln \mathcal{L} \left( X_{t_i} | X_{t_{i-1}}, \theta, \mu, \sigma \right) \right\}
+\end{equation} \footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+For our portfolio pair, the optimal value of \( B \) is as follows:
+\begin{itemize}
+    \item \textbf{AUDJPY/CADJPY:} \( B = -0.0000 \)
+\end{itemize}
+
+This value of \( B \) is utilized to construct a mean-reverting portfolio between the exchange rate \( S_t^1 \) and the price of \( S_t^2 \).\\
+
+
+
+IMPORTANT: The portfolio series need to be updated periodically using the optimized pair ratio.
+
+\section{ENTRY AND OPTIMIZED EXIT}
+In this section, we will detail the methodology for opening and closing positions within our trading strategy.
+\section*{Entry Condition}
+
+At every hour, the strategy evaluates whether to generate an entry signal. The entry signal, denoted as \( \text{Sig}_{S1} \), is triggered if the portfolio value \( X_t \) falls below the moving average minus one standard deviation. Mathematically, this condition is expressed as:
+
+\[
+\text{Sig}_{S1} = 
+\begin{cases} 
+1, & \text{if } X_t < \text{MA}(X_t) - \sigma(X_t) \\
+0, & \text{otherwise}
+\end{cases}
+\]
+
+This criterion indicates that the portfolio value is substantially lower than its historical average, suggesting a potential opportunity for mean reversion\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\.
+
+
+\subsection*{Entry Signal Execution}
+Upon the condition \( \text{Sig}_{S1} = 1 \), the strategy proceeds to enter a position. This entails taking a long position in the first asset \( S1 \) and a corresponding short position in the second asset \( S2 \), adjusted by the optimized pair ratio \( B \). The corresponding signal for the \textbf{second asset} is given by:
+
+\[
+\text{Sig}_{S2} = -B \cdot \text{Sig}_{S1}
+\]
+
+This strategy maintains market neutrality and capitalizes on mean reversion by entering positions when the portfolio is undervalued. It leverages expected price corrections towards the historical mean to maximize returns\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+\section*{Optimal Exit Level $b_t$}
+To find the optimal exit point we have to find before the optimal exit level, \( b_t \), that is essential for maximizing trading strategy profits. The steps to determine and utilize this level are as follows:\\
+
+To find the optimal exit level, solve an optimal stopping problem. This aims to maximize the expected payoff by exiting at the most favorable time:
+
+\[
+V(x) = \sup_{\tau} \mathbb{E} \left[ e^{-r \tau} (X_{\tau} - c) \right]
+\]
+
+where \( r \) is the discount rate, and \( c \) represents costs related to holding or exiting a position.
+
+The optimal exit level \( b_t \) is found by solving:
+
+\[
+F(b) = (b - c) F'(b)
+\]
+
+Here:
+
+\[
+F(x) = \int_0^\infty u^{\frac{2\mu}{\sigma^2} - 1} e^{\sqrt{\frac{2\mu}{\sigma^2}} (\theta - x) u - \frac{u^2}{2}} du
+\]
+
+Using numerical methods, approximate \( F(x) \) and its derivative to find \( b \). This level \( b_t \) is a dynamic threshold adjusting to market conditions, ensuring exits at optimal points\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+For our portfolio pair, the optimal value of \( b \) is as follows:
+\begin{itemize}
+    \item \textbf{AUDJPY/CADJPY:} \( b = 94.2354 \)
+\end{itemize}
+
+
+\section*{Exit Condition}
+
+The strategy uses the optimal exit level \( b_t \) to decide when to exit positions to maximize returns. Hourly, the strategy checks if the portfolio value \( X_t \) exceeds the optimal exit level \( b_t \) or the moving average plus one standard deviation. The exit signals are defined as follows:
+
+
+
+1. **Moving Average Exit**:
+    - Exit if \( X_t \) exceeds the moving average plus one standard deviation:
+    \[
+    \text{Sig}_{S1} = 
+    \begin{cases} 
+    0, & \text{if } X_t > \text{MA}(X_t) + \sigma(X_t) \\
+    \text{Sig}_{S1, t-1}, & \text{otherwise}
+    \end{cases}
+    \]
+
+2. **Optimal Exit Level**:
+    - Exit if \( X_t \) exceeds the optimal exit level \( b_t \):
+    \[
+    \text{Sig}_{S1} = 
+    \begin{cases} 
+    0, & \text{if } X_t > b_t \\
+    \text{Sig}_{S1, t-1}, & \text{otherwise}
+    \end{cases}
+    \]
+The optimal exit level \( b_t \) helps to:
+\begin{itemize}
+
+    \item Reduce trade frequency and transaction costs.
+    \item Ensure exits at the best possible prices, maximizing returns.
+\end{itemize}\vspace{1em}
+
+For the \textbf{second asset}, adjust the exit signal based on the pair ratio \( B_t \):
+\[
+\text{Sig}_{S2} = 
+\begin{cases} 
+0, & \text{if } \text{Sig}_{S1} = 0 \\
+-\text{Sig}_{S2, t-1}, & \text{otherwise}
+\end{cases}
+\]
+
+
+\subsection*{Exit Signal Execution}
+
+Upon meeting exit conditions, the strategy liquidates positions by selling the long in \( S1 \) and covering the short in \( S2 \), optimizing the capture of profits\footnote{Source: Donovan Lee, Tim Leung, \textit{On the Efficacy of Optimized Exit Rule for Mean Reversion Trading}, 2020.}.\\
+
+\section{BACKTESTING OF THE STRATEGY}
+
+Before proceeding with our trading algorithm, we conducted a thorough backtest. The backtest involved estimating the parameters using 15 minute-level data from the entire month of May. As previously explained, the optimal parameters are:
+
+\begin{itemize}
+    \item \( \mu = 0.0000 \)
+    \item \( \theta = 94.2406 \)
+    \item \( \sigma = 0.0010 \)
+    \item \( B = -0.0000 \)
+    \item \( b = 94.2354 \)
+\end{itemize}
+
+Over the course of one month, the portfolio demonstrated a modest yet positive performance. Starting with an initial value of \$100,000 the portfolio's value increased to \$100,905.95 by the end of the month, resulting in a total return of 0.91\%. This gain shows a small, steady improvement in the portfolio's value over the short term.
+
+The portfolio's Sharpe ratio for the month was 0.01, indicating a minimal risk-adjusted return. This means the portfolio's returns were only slightly higher than the risk-free rate when accounting for its volatility. While the portfolio made a gain, its performance barely exceeded the expected return for the risk taken.
+
+The portfolio achieved a high win rate of 81.21\%, indicating that a significant majority of trades or investment decisions made during the month were profitable. This high success rate points to effective trade selection and strategy execution. However, it is important to evaluate the win rate in conjunction with the average size of gains and losses to fully understand its impact on the overall portfolio performance.
+
+In summary, the portfolio's performance over the one-month period was encouraging, showing a notable increase in value and a high win rate. Nevertheless, the relatively low Sharpe ratio underscores an opportunity to enhance the portfolio's risk-return profile. Future strategies should aim to improve returns relative to risk to achieve more favorable performance metrics, especially for similar short-term trading periods.
+
+\section{HOW TO USE THE STRATEGY IN A LIVE ACCOUNTS}
+It is crucial to follow two main steps:
+
+\textbf{Step 1:} Estimate the parameters \( \mu \), \( \theta \), \( \sigma \), \( B \), and the optimal exit level (\( b \)) for today using 15 minute-level data from the past 30 days.
+
+\textbf{Step 2:} After estimating these parameters, connect the code to Interactive Brokers (IBKR) to access live market data. The algorithm will then autonomously monitor and manage positions, ensuring the strategy is executed in real-time.
+\clearpage
+
+
+\section{Methodology}
+
+OpenAI, ChatGPT 4.0, 2024-06-15: Conduct a CADF test using the previously mentioned currency pairs.\\
+OpenAI, ChatGPT 4.0, 2024-06-15: Develop optimal exit signals following the steps in the provided images.\\
+OpenAI, ChatGPT 4.0, 2024-06-16: Optimize parameters and execute trades by following the instructions in the images.\\
+
+
+
+
+
+
+
+
+
+
+
+\end{document}
