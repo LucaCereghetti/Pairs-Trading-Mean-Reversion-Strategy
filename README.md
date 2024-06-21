@@ -22,5 +22,5 @@ The implementation of the strategy is available in the Jupyter notebook: [Final_
 
 2. **Run the Implementation**:
    - Open the [Final_Pair_forex_trading.ipynb](./Final_Pair_forex_trading.ipynb) Jupyter notebook, download the file.
-   - You can run the notebook locally on your machine. Ensure you have the necessary Python packages installed
-   - Before runiing the code make sure you are connected to Interctive broker Trader Workstation, and relative account
+   - You can run the notebook locally on your machine. Ensure you have the necessary Python packages installed.
+   - Before runing the code make sure you are connected to Interctive broker Trader Workstation, and relative account.
