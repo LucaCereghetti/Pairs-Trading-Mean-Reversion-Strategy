@@ -4,7 +4,7 @@ Welcome to the Forex Trading Strategy repository. This repository contains all t
 
 ## Strategy Explanation
 
-The detailed strategy explanation can be found in the PDF file: [Pairs Trading Mean Reversion Strategy_FINAL.pdf](./Pairs Trading Mean Reversion Strategy_FINAL.pdf)
+The detailed strategy explanation can be found in the PDF file: [Pairs Trading Mean Reversion Strategy_FINAL.pdf](./Pairs_Trading_Mean_Reversion_Strategy_FINAL.pdf)
 
 ## Implementation
 
